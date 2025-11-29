@@ -10,4 +10,12 @@ export default defineConfig({
         }),
         react(),
     ],
+    //  server: {
+    //     host: true,       // <--- importante
+    //     port: 5173,       // <--- puedes cambiarlo si lo necesitas
+    //     hmr: {
+    //         host: '192.168.138.141', // <-- tu IP local (no localhost)
+    //     },
+        
+    // },
 });
