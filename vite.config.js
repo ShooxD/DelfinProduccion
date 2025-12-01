@@ -10,6 +10,11 @@ export default defineConfig({
         }),
         react(),
     ],
+
+     build: {
+        // Establece el límite de advertencia de tamaño de chunk a 1000 kB (1 MB)
+        chunkSizeWarningLimit: 5000, 
+    },
     //  server: {
     //     host: true,       // <--- importante
     //     port: 5173,       // <--- puedes cambiarlo si lo necesitas
