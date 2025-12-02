@@ -372,6 +372,112 @@ class UnidadesController extends Controller
     // use App\Models\Unidades; // Asumiendo el nombre de tu modelo
     // use App\Models\Movimientos; // Asumiendo el nombre de tu modelo
 
+    public function QuienconQuienUnidadesDashboard(Request $request)
+    {
+        $today = now()->toDateString();
+
+        // 1. Obtener TODAS las unidades existentes
+        $todasLasUnidades = Unidades::all()->keyBy('Unidades_unidadID');
+        // Usamos keyBy para un acceso rápido por ID de unidad.
+
+        // 2. Obtener las asignaciones de hoy con un join para obtener el número económico
+        $asignacionesDeHoy = ChoferUnidadAsignar::whereDate('CUA_fechaAsignacion', $today)
+            ->join('dbo.Unidades', 'dbo.ChoferUnidadAsignada.CUA_unidadID', '=', 'Unidades.Unidades_unidadID')
+            ->select(
+                'dbo.ChoferUnidadAsignada.CUA_unidadID',
+                'dbo.ChoferUnidadAsignada.CUA_choferID',
+                'dbo.ChoferUnidadAsignada.CUA_destino',
+                'dbo.ChoferUnidadAsignada.CUA_motivoID',
+                'dbo.ChoferUnidadAsignada.CUA_fechaAsignacion',
+                'dbo.ChoferUnidadAsignada.CUA_asignacionID',
+                'Unidades.Unidades_numeroEconomico'
+            )
+            ->where('dbo.ChoferUnidadAsignada.CUA_estatus', 1)
+            ->get();
+
+        // 3. Mapear las asignaciones de hoy para obtener el último movimiento
+        $asignacionesConMovimiento = $asignacionesDeHoy->map(function ($asignacion) {
+            $ultimoMovimiento = Movimientos::where('Movimientos_asignacionID', $asignacion->CUA_asignacionID)
+                ->latest('Movimientos_fecha')
+                ->first();
+
+            // Asignar el último movimiento o 'ENTRADA' por defecto
+            $asignacion->UltimoMovimiento = $ultimoMovimiento
+                ? $ultimoMovimiento->Movimientos_tipoMovimiento
+                : 'ENTRADA';
+
+            return $asignacion;
+        })->keyBy('CUA_unidadID'); // Indexar las asignaciones por ID de unidad
+
+        // Inicializar contadores
+        $totalRojo = 0;
+        $totalAmarillo = 0;
+        $totalVerde = 0;
+
+        // 4. Construir la colección final combinando TODAS las unidades con las asignaciones de hoy
+        $resultadoFinal = $todasLasUnidades->map(function ($unidadBase) use ($asignacionesConMovimiento, &$totalRojo, &$totalAmarillo, &$totalVerde) {
+            $unidadID = $unidadBase->Unidades_unidadID;
+            $asignada = $asignacionesConMovimiento->has($unidadID);
+            $unidadBase->ColorEstatus = 'ROJO'; // Establecer un valor por defecto que será sobrescrito
+
+            // Transferir/Inicializar campos de asignación
+            $unidadBase->CUA_unidadID = $unidadID;
+            $unidadBase->CUA_choferID = null;
+            $unidadBase->CUA_destino = null;
+            $unidadBase->CUA_motivoID = null;
+            $unidadBase->CUA_fechaAsignacion = null;
+            $unidadBase->CUA_asignacionID = null;
+            $unidadBase->UltimoMovimiento = 'ENTRADA';
+
+            if ($asignada) {
+                // Si está asignada, usar los datos de la asignación
+                $asignacion = $asignacionesConMovimiento->get($unidadID);
+
+                $unidadBase->CUA_choferID = $asignacion->CUA_choferID;
+                $unidadBase->CUA_destino = $asignacion->CUA_destino;
+                $unidadBase->CUA_motivoID = $asignacion->CUA_motivoID;
+                $unidadBase->CUA_fechaAsignacion = $asignacion->CUA_fechaAsignacion ?? null;
+                $unidadBase->CUA_asignacionID = $asignacion->CUA_asignacionID ?? null;
+                // Unidades_numeroEconomico ya está en $unidadBase si no hubo asignación, pero se actualiza para asegurar si viene del join.
+                // En este caso, el join se hizo sobre $asignacionesDeHoy, por lo que el numeroEconomico viene de ahi.
+                // PERO si se usa $todasLasUnidades, es mejor usar el que ya viene en $unidadBase o asegurar que se toma el correcto.
+                // Para el caso de unidades NO asignadas, el valor de $unidadBase->Unidades_numeroEconomico es el correcto.
+                // Para las asignadas, el numeroEconomico ya viene en la asignacion si se necesita: $asignacion->Unidades_numeroEconomico.
+                // Pero como la base es $todasLasUnidades, simplemente dejamos el de $unidadBase.
+
+                $unidadBase->UltimoMovimiento = $asignacion->UltimoMovimiento;
+
+                // Lógica de color para unidades ASIGNADAS
+                if ($unidadBase->UltimoMovimiento === 'SALIDA') {
+                    $unidadBase->ColorEstatus = 'VERDE'; // Asignada y en la calle
+                    $totalVerde++;
+                } else { // $unidadBase->UltimoMovimiento === 'ENTRADA'
+                    $unidadBase->ColorEstatus = 'AMARILLO'; // Asignada pero en patio/regreso
+                    $totalAmarillo++;
+                }
+            } else {
+                // Lógica de color para unidades NO ASIGNADAS
+                // Si no está asignada hoy (CUA_choferID es null), es ROJO.
+                $unidadBase->ColorEstatus = 'ROJO';
+                $totalRojo++;
+            }
+
+            // Remover el campo original 'Unidades_unidadID' si solo quieres ver 'CUA_unidadID' en el JSON final
+            unset($unidadBase->Unidades_unidadID);
+
+            return $unidadBase;
+        })->values(); // Quitar las claves para que sea un array simple en el JSON
+
+        // 5. Devolver el resultado final que contiene todas las unidades (asignadas o no) y los totales
+        return response()->json([
+
+            'totalRojo' => $totalRojo,
+            'totalAmarillo' => $totalAmarillo,
+            'totalVerde' => $totalVerde,
+            'totalUnidades' => $resultadoFinal->count()
+        ]);
+    }
+
     public function QuienconQuienUnidades(Request $request)
     {
         $today = now()->toDateString();
@@ -447,6 +553,9 @@ class UnidadesController extends Controller
         // 5. Devolver el resultado final que contiene todas las unidades (asignadas o no)
         return response()->json($resultadoFinal);
     }
+
+
+
 
     public function QuienconQuienControl(Request $request)
     {

@@ -5,16 +5,16 @@ import request from "@/utils";
 
 
 import {
-  Truck,
-  User,
-  Plus,
-  ArrowRight,
-  ClipboardList,
-  FileText,
-  Clock,
-  ArrowUpRight,
-  ArrowDownLeft,
-  ChevronsRight, SendHorizontal
+    Truck,
+    User,
+    Plus,
+    ArrowRight,
+    ClipboardList,
+    FileText,
+    Clock,
+    ArrowUpRight,
+    ArrowDownLeft,
+    ChevronsRight, SendHorizontal
 } from 'lucide-react';
 
 import { useEffect, useState } from "react";
@@ -29,6 +29,7 @@ export default function QuienConQuienTransporte() {
         destinos: [],
         motivos: [],
         quienConQuien: [],
+        dashboard: [],
         tipo: ''
     });
 
@@ -38,12 +39,16 @@ export default function QuienConQuienTransporte() {
             destinos,
             motivos,
             choferes,
-            Qconquien
+            Qconquien,
+            dashboard
         ] = await Promise.all([
             request(route('DestinosQuiencQuien')),
             request(route('MotivosQuiencQuien')),
             request(route('users.index')),
             request(route('QuienconQuienUnidades')),
+            request(route('QuienconQuienUnidadesDashboard')),
+
+
         ]);
 
         setStates(prev => ({
@@ -52,6 +57,7 @@ export default function QuienConQuienTransporte() {
             motivos: motivos,
             destinos: destinos,
             choferes: choferes,
+            dashboard: dashboard,
             loading: false,
         }));
     };
@@ -180,10 +186,10 @@ export default function QuienConQuienTransporte() {
     }
 
     const stats = [
-        { name: 'Unidades fuera de area', value: 0, icon: Truck, color: 'text-green-600' },
-        { name: 'Unidades en patio', value: 0, icon: Truck, color: 'text-yellow-600' },
-        { name: 'Unidades sin asignar ', value: 0, icon: Truck, color: 'text-red-500' },
-    ]
+        { name: 'Unidades fuera de area', value: states.dashboard.totalVerde ?? 0, icon: Truck, color: 'text-green-600' },
+        { name: 'Unidades en patio', value: states.dashboard.totalAmarillo ?? 0, icon: Truck, color: 'text-yellow-600' },
+        { name: 'Unidades sin asignar ', value: states.dashboard.totalRojo ?? 0, icon: Truck, color: 'text-red-500' },
+    ];
 
     return (
         <div className="relative h-[98%] pb-4 px-3 overflow-auto blue-scroll">
@@ -250,13 +256,7 @@ export default function QuienConQuienTransporte() {
                                             );
                                         },
                                     },
-                                    // {
-                                    //     header: 'UltimoMovimiento',
-                                    //     accessor: 'UltimoMovimiento',
-                                    //     alignment: 'start',
-                                    //     width: '10%',
-                                    //     editable: false
-                                    // },
+
                                     {
                                         header: 'Unidad',
                                         accessor: 'Unidades_numeroEconomico',

@@ -1,10 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import Datatable from "@/Components/Datatable";
-
 import SelectInput from "@/components/SelectInput";
-
 import { toast } from 'sonner';
 
+
+// Opciones de combustible como constante
+const FUEL_OPTIONS = [
+    { nombre: '1/8', escala_valor: 1, litros: 5 },
+    { nombre: '1/4', escala_valor: 2, litros: 10 },
+    { nombre: '3/8', escala_valor: 3, litros: 15 },
+    { nombre: '1/2', escala_valor: 4, litros: 20 },
+    { nombre: '5/8', escala_valor: 5, litros: 25 },
+    { nombre: '3/4', escala_valor: 6, litros: 30 },
+    { nombre: '7/8', escala_valor: 7, litros: 35 },
+    { nombre: 'Lleno', escala_valor: 8, litros: 40 }
+];
 
 const RegistroYSalidaUnificado = () => {
 
@@ -19,7 +29,6 @@ const RegistroYSalidaUnificado = () => {
         QuienconQuienControl: []
     });
 
-
     const [informacion, setInformacion] = useState({
         NombreUnidad: '',
         UltimoKilometraje: '',
@@ -28,6 +37,7 @@ const RegistroYSalidaUnificado = () => {
         Estado: '',
     });
 
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const userObject = JSON.parse(localStorage.getItem('user'));
 
@@ -42,7 +52,6 @@ const RegistroYSalidaUnificado = () => {
 
     const loadAllData = async () => {
         try {
-            // 1. Ejecutar todas las llamadas API en paralelo con Promise.all
             const [
                 MotivosData,
                 UnidadesData,
@@ -50,18 +59,15 @@ const RegistroYSalidaUnificado = () => {
                 AyudantesData,
                 DestinosData,
                 ListasData,
-                // QuienconQuienControl,
             ] = await Promise.all([
                 fetchData("MotivosQuiencQuien"),
                 fetchData("UnidadesQuiencQuien"),
-                fetchData("users.index"), // Rutas asumidas
-                fetchData("users.index"), // Rutas asumidas
+                fetchData("users.index"), 
+                fetchData("users.index"), 
                 fetchData("DestinosQuiencQuien"),
                 fetchData("listaverificacion.index"),
-                // fetchData("QuienconQuienControl", { id: 2 })
             ]);
 
-            // **2. Una única llamada a setRequests con todos los datos**
             setRequests(prevRequests => ({
                 ...prevRequests,
                 Motivos: MotivosData,
@@ -70,13 +76,10 @@ const RegistroYSalidaUnificado = () => {
                 Ayudantes: AyudantesData,
                 Destinos: DestinosData,
                 ListasVerificacion: ListasData,
-                // QuienconQuienControl: QuienconQuienControl,
-
             }));
 
         } catch (error) {
             console.error('Error al cargar datos:', error);
-            // Opcional: toast.error('No se pudieron cargar algunos datos iniciales.');
         }
     }
 
@@ -95,9 +98,7 @@ const RegistroYSalidaUnificado = () => {
         combustible: '',
         checklist: [],
         authorizationCode: '',
-
         user: userObject.Personas_usuarioID
-
     };
 
     const [form, setForm] = useState(initialFormState);
@@ -129,6 +130,7 @@ const RegistroYSalidaUnificado = () => {
 
 
     const CrearAsignacion = async () => {
+        setIsSubmitting(true);
         try {
             const response = await fetch(route('asignaciones.store'), {
                 method: 'POST',
@@ -137,13 +139,9 @@ const RegistroYSalidaUnificado = () => {
             });
 
             if (!response.ok) {
-                // Maneja el error de respuesta HTTP aquí también
                 const errorText = await response.text();
-                // console.error('Error en la respuesta del servidor:', errorText);
-
-                // Lanza un error para que sea capturado por el bloque catch
                 toast.error(errorText);
-
+                throw new Error("Respuesta no ok");
             }
 
             const data = await response.json();
@@ -155,33 +153,26 @@ const RegistroYSalidaUnificado = () => {
                 UltimosMovimientos: [],
             }));
         } catch (err) {
-            // console.error('Error al obtener movimientos:', err);
-            // ⭐ Agregamos el toast de error aquí
+            console.error('Error al obtener movimientos:', err);
             toast.error("Ocurrió un error al crear el movimiento.");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
     const handleChecklistToggle = (listId, statusValue) => {
-        // listId: El ID de la lista (ej: '1', '2', etc., pasado por el 'name' del ConditionToggle)
-        // statusValue: 'Si' o 'No'
-
         setForm(prevForm => {
             const currentChecklist = prevForm.checklist;
-
-            // 1. Busca si el elemento ya existe en el array
             const existingIndex = currentChecklist.findIndex(item => item.id === listId);
-
             let newChecklist;
 
             if (existingIndex > -1) {
-                // 2. Si existe, actualiza su propiedad 'observacion'
                 newChecklist = currentChecklist.map((item, index) =>
                     index === existingIndex
-                        ? { ...item, observacion: statusValue } // Actualiza inmutablemente
+                        ? { ...item, observacion: statusValue } 
                         : item
                 );
             } else {
-                // 3. Si no existe, agrega el nuevo objeto al final
                 const newItem = {
                     id: listId,
                     observacion: statusValue
@@ -195,7 +186,7 @@ const RegistroYSalidaUnificado = () => {
             };
         });
     };
-    // Función para cambiar el tipo de movimiento
+
     const setMovementType = (type) => {
         setForm(prev => ({
             ...prev,
@@ -217,71 +208,51 @@ const RegistroYSalidaUnificado = () => {
     );
 
     useEffect(() => {
-
-
         const Unidad = requests.Unidades.find(u => u.Unidades_unidadID === Number(form.unit));
         const QuienConQuien = requests.QuienconQuienControl.find(u => Number(u.CUA_unidadID) === Number(form.unit));
-
         const Chofer = requests.Choferes.find(C => C.Personas_usuarioID === Number(form.driver));
 
-
-
-        // Variables para almacenar la información, con valores predeterminados seguros
         let nombreUnidad = '';
         let nombreOperador = '';
 
-        // 1. Verificar si la Unidad fue encontrada
         if (Unidad) {
             nombreUnidad = Unidad.Unidades_numeroEconomico;
         }
 
-        // 2. Verificar si el Chofer fue encontrado
         if (Chofer) {
-            // Usar la propiedad del objeto Chofer encontrado
             nombreOperador = Chofer.nombre_completo || '';
         }
 
-        console.log("QuienConQuien", QuienConQuien);
         if (QuienConQuien) {
-            setForm({
-                ...form,
+            setForm(prevForm => ({
+                ...prevForm,
                 motive: QuienConQuien.CUA_motivoID,
                 destination: QuienConQuien.CUA_destino,
                 driver: QuienConQuien.CUA_choferID,
                 user: userObject.Personas_usuarioID
-
-            });
-            console.log("Estado 'form' actualizado con datos de QuienConQuien.");
+            }));
         }
-        // 3. Establecer el estado con la información recopilada
+        
         setInformacion({
             NombreUnidad: nombreUnidad,
-            UltimoKilometraje: '', // Placeholder
-            NombreAyudante: '',    // Placeholder
+            UltimoKilometraje: '', 
+            NombreAyudante: '',    
             NombreOperador: nombreOperador,
-            Estado: '',            // Placeholder
+            Estado: '',            
         });
 
-    }, [form.unit, form.driver]);
+    }, [form.unit, form.driver, requests.Unidades, requests.Choferes, requests.QuienconQuienControl]);
 
     const getAllData = async () => {
         try {
             const quien = await fetch(route("QuienconQuienControl", { id: form.movementType })).then(res => res.json());
 
-            setForm(prevRequests => ({
-                ...prevRequests,
-                kilometers: 0,
-                motive: '',
-                observation: '',
-                combustible: '',
-                checklist: [],
-                authorizationCode: '',
-                unit: '',
-                driver: '',
-                destination: '',
-                user: userObject.Personas_usuarioID
-
+            // Resetear el formulario, manteniendo el tipo de movimiento
+            setForm(prevForm => ({
+                ...initialFormState,
+                movementType: prevForm.movementType,
             }));
+            
             setRequests(prevRequests => ({
                 ...prevRequests,
                 QuienconQuienControl: quien,
@@ -291,10 +262,9 @@ const RegistroYSalidaUnificado = () => {
         }
     };
 
-    // --- Implementación de useEffect para el cambio ---
     useEffect(() => {
         getAllData();
-    }, [form.movementType]); // <--- DEPENDENCIA: Elige qué valor monitorear
+    }, [form.movementType]); 
 
     const ConditionToggle = ({ label, name, currentValue, onToggle, isCritical = false }) => (
         <div className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
@@ -425,48 +395,7 @@ const RegistroYSalidaUnificado = () => {
                             label="Combustible"
                             value={form.combustible}
                             onChange={(event) => { setForm({ ...form, combustible: event.target.value }); }}
-                            options={[
-                                {
-                                    nombre: '1/8',
-                                    escala_valor: 1, // Se utiliza para el 'value' del select
-                                    litros: 5
-                                },
-                                {
-                                    nombre: '1/4',
-                                    escala_valor: 2,
-                                    litros: 10
-                                },
-                                {
-                                    nombre: '3/8',
-                                    escala_valor: 3,
-                                    litros: 15
-                                },
-                                {
-                                    nombre: '1/2',
-                                    escala_valor: 4,
-                                    litros: 20
-                                },
-                                {
-                                    nombre: '5/8',
-                                    escala_valor: 5,
-                                    litros: 25
-                                },
-                                {
-                                    nombre: '3/4',
-                                    escala_valor: 6,
-                                    litros: 30
-                                },
-                                {
-                                    nombre: '7/8',
-                                    escala_valor: 7,
-                                    litros: 35
-                                },
-                                {
-                                    nombre: 'Lleno',
-                                    escala_valor: 8,
-                                    litros: 40
-                                }
-                            ]}
+                            options={FUEL_OPTIONS} // Usar la constante
                             placeholder="Seleccionar combustible"
                             valueKey="escala_valor"
                             labelKey="nombre"
@@ -483,8 +412,8 @@ const RegistroYSalidaUnificado = () => {
                                 type="number"
                                 name="Motivos_nombre"
                                 value={form.kilometers}
-                                onChange={(e) => { // <-- Cambiado de (value) a (e) para recibir el objeto de evento
-                                    setForm({ ...form, kilometers: e.target.value }); // <-- Usando e.target.value para obtener el valor
+                                onChange={(e) => { 
+                                    setForm({ ...form, kilometers: e.target.value }); 
                                 }}
                                 className="p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
                             />
@@ -500,8 +429,8 @@ const RegistroYSalidaUnificado = () => {
                                 type="text"
                                 name="Motivos_nombre"
                                 value={form.observation}
-                                onChange={(e) => { // <-- Cambiado de (value) a (e) para recibir el objeto de evento
-                                    setForm({ ...form, observation: e.target.value }); // <-- Usando e.target.value para obtener el valor
+                                onChange={(e) => { 
+                                    setForm({ ...form, observation: e.target.value }); 
                                 }}
                                 className="p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
                             />
@@ -515,12 +444,9 @@ const RegistroYSalidaUnificado = () => {
                         {requests.ListasVerificacion.map((item) => {
                             const listId = item.ListaVerificacion_listaID.toString();
 
-                            // 🚨 CORRECCIÓN CLAVE: Asegurar que form.checklist sea un array antes de buscar.
                             const currentItem = Array.isArray(form.checklist)
                                 ? form.checklist.find(i => i.id === listId)
                                 : undefined;
-
-                            // Esto evita el error si form.checklist es undefined, null, o un objeto {}
 
                             const currentValue = currentItem ? currentItem.observacion : undefined;
 
@@ -540,14 +466,29 @@ const RegistroYSalidaUnificado = () => {
 
                     <button
                         onClick={CrearAsignacion}
-                        disabled={form.unit === '' || form.driver === '' || form.destination === '' || form.motive === '' || form.kilometers === '' || form.combustible === ''}
+                        disabled={
+                            isSubmitting || 
+                            form.unit === '' || 
+                            form.driver === '' || 
+                            form.destination === '' || 
+                            form.motive === '' || 
+                            form.kilometers === 0 || 
+                            form.combustible === ''
+                        }
                         className={`w-full py-3 text-white text-lg font-bold rounded-lg shadow-xl transition-colors 
-        ${form.unit === '' || form.driver === '' || form.destination === '' || form.motive === '' || form.kilometers === '' || form.combustible === ''
+                        ${
+                            isSubmitting || 
+                            form.unit === '' || 
+                            form.driver === '' || 
+                            form.destination === '' || 
+                            form.motive === '' || 
+                            form.kilometers === 0 || 
+                            form.combustible === ''
                                 ? 'bg-gray-400 cursor-not-allowed'
                                 : 'bg-blue-600 hover:bg-blue-700'
                             }`}
                     >
-                        REGISTRAR MOVIMIENTO
+                        {isSubmitting ? 'REGISTRANDO...' : 'REGISTRAR MOVIMIENTO'} 
                     </button>
                 </div>
 
@@ -560,9 +501,24 @@ const RegistroYSalidaUnificado = () => {
                     <div className="flex flex-col gap-4 mb-6">
                         <ResumenItem label="Unidad" value={informacion.NombreUnidad || '—'} />
                         <ResumenItem label="Chofer / Ayudante" value={informacion.NombreOperador || '—'} />
-                        <ResumenItem label="Motivo" value={form.motive || '—'} />
-                        <ResumenItem label="Destino" value={form.destination || '—'} />
-                        <ResumenItem label="KM / Combustible" value={`${informacion.UltimoKilometraje} / 0`} />
+                        
+                        {/* ⭐ CORRECCIÓN: Evitar .find en undefined */}
+                        <ResumenItem 
+                            label="Motivo" 
+                            value={(requests.Motivos || []).find(m => m.Motivos_motivoID == form.motive)?.Motivos_nombre || '—'} 
+                        />
+                        
+                        {/* ⭐ CORRECCIÓN: Evitar .find en undefined */}
+                        <ResumenItem 
+                            label="Destino" 
+                            value={(requests.Destinos || []).find(d => d.Destinos_Id == form.destination)?.Destinos_Nombre || '—'} 
+                        />
+                        
+                        {/* ⭐ CORRECCIÓN: Usar FUEL_OPTIONS para el nombre del combustible */}
+                        <ResumenItem 
+                            label="KM / Combustible" 
+                            value={`${form.kilometers || '—'} / ${FUEL_OPTIONS.find(c => c.escala_valor == form.combustible)?.nombre || '—'}`} 
+                        />
                     </div>
 
                     <h2 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">Últimos movimientos</h2>
