@@ -56,7 +56,6 @@ export default function Home({ auth }) {
         // debas agregar una clase de estado aquí, como <div id="page-container" className={`flex h-screen w-screen overflow-hidden ${!showMenu ? 'body-container open' : ''}`}>
         // Pero por ahora, nos enfocamos en el ancho.
         <div id="page-container" className="flex h-screen w-screen overflow-hidden">
-
             {/** 1. Menú Lateral Fijo (Columna 1) **/}
             {/* 🔴 CAMBIO CLAVE: Se eliminan las clases w-64 y bg-gray-800. */}
             {/* LeftMenu ahora controlará su propio ancho (290px -> 49px) y fondo. */}
