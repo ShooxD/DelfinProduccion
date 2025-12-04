@@ -66,14 +66,14 @@ export default function Home({ auth }) {
             </div>
 
             {/** 2. Contenido Principal (Columna 2) - Ocupa el espacio restante **/}
-            <div className="flex flex-col flex-grow min-w-0 h-full bg-gray-100">
+            <div className="content sm:overflow-auto md:overflow-hidden bg-gray-100 font-sans">
 
                 {/** A. Header Fijo **/}
                 <Header />
 
                 {/** B. Área Desplazable de Rutas (Páginas) **/}
                 {/* flex-grow asegura que ocupe todo el espacio vertical restante después del Header */}
-                <div className="flex-grow overflow-y-auto p-4 styled-scroll">
+                <div className="scrollable-content styled-scroll px-4">
                     <Routes>
                         {
                             routes.map((route, index) => (
